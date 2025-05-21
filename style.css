@@ -23,3 +23,77 @@ article.ticket-card {
   font-weight: normal;
   text-align: center;
 }
+
+.backlog {
+  hr {
+    display: none;
+  }
+}
+
+.backlog:has(.hx-drag) {
+  hr {
+    display: block;
+    height: 4px;
+    &.hx-drag-over {
+      background: #2889be;
+      height: 20px;
+    }
+  }
+  article {
+    margin-top: 0px;
+  }
+}
+
+dialog {
+  backdrop-filter: blur(2px);
+  background-color: transparent;
+  header button {
+    float: right;
+    padding: 0px;
+    width: 33px;
+    height: 33px;
+    margin-top: 0;
+    background-color: lightcoral;
+    border-color: gray;
+  }
+}
+
+.split-view{
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  align-items: flex-start;
+  align-content: stretch;
+  .main {
+    display: block;
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-basis: auto;
+    align-self: auto;
+    order: 0;
+  }
+  .sidebar {
+    display: block;
+    flex-grow: 0;
+    flex-shrink: 1;
+    flex-basis: auto;
+    align-self: auto;
+    order: 0;
+    width: 400px;
+    padding: 20px;
+  }
+}
+
+h2 button, .ticket-card button {
+  float: right;
+  margin-top: 0;
+  border-color: gray;
+}
+
+.no-tickets-placeholder {
+  text-align: center;
+  padding: 40px;
+  color: gray;
+  font-style: italic;
+}
