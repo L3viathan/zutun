@@ -2,8 +2,6 @@ from collections import defaultdict
 
 
 class Component:
-    """MISSING"""
-
     sep = ""
     def __init__(self, **kwargs):
         self.kwargs = defaultdict(str, kwargs)
@@ -35,6 +33,14 @@ class Kanban(Component):
     </article>
     """
 
+class Backlog(Component):
+    """
+    <article>
+      {items}
+    </article>
+    """
+
+
 class KanbanColumn(Component):
     """
     <div class="kanban-col kanban-col-{name}">
@@ -55,7 +61,7 @@ class TicketCard(Component):
     </article>
     """
 
-    sep = "·"
+    sep = " · "
 
 
 class Page(Component):
@@ -69,8 +75,18 @@ class Page(Component):
         <link rel="stylesheet" href="/style.css">
         <link rel="stylesheet" href="/pico.min.css">
     </head>
-    <body>
-        <main class="container">
+    <body class="container">
+        <nav>
+            <ul>
+                <li>zutun</li>
+                <li><a href="/">Board</a></li>
+                <li><a href="/backlog">Backlog</a></li>
+            </ul>
+            <ul>
+                <li>Search</li>
+            </ul>
+        </nav>
+        <main>
             {body}
         </main>
     </body>

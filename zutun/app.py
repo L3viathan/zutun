@@ -14,21 +14,38 @@ tickets = {
 
 def _tickets_in_state(state):
     return [
-        TicketCard(title=t["title"], number=t["number"], assignee=t["assignee"], storypoints=t["storypoints"])
+        TicketCard(title=t["title"], details=[t["assignee"], t["storypoints"]], number=t["number"])
         for t in tickets.values()
         if t["state"] == state
     ]
 
+def _all_tickets():
+    return [
+        TicketCard(title=t["title"], details=[t["assignee"], t["storypoints"], t["state"]], number=t["number"])
+        for t in tickets.values()
+    ]
+
 
 @app.get("/")
-async def home(request):
+async def board(request):
     page = Page(
-        title="zutun",
+        title="zutun — Board",
         body=Kanban(
             columns=[
                 KanbanColumn(name=state, items=_tickets_in_state(state))
                 for state in ["ToDo", "Ongoing", "Blocked", "Done"]
             ],
+        ),
+    )
+    return html(str(page))
+
+
+@app.get("/backlog")
+async def backlog(request):
+    page = Page(
+        title="zutun — Backlog",
+        body=Backlog(
+            items=_all_tickets(),
         ),
     )
     return html(str(page))
