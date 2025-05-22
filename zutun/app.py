@@ -98,7 +98,10 @@ async def view_ticket(request, ticket_id: int):
             title=ticket["summary"],
             summary=replace_ticket_references(ticket["description"]),
             properties=props,
-            comments=[Comment(**comment) for comment in comments],
+            comments=[Comment(
+                created_at=comment["created_at"],
+                text=replace_ticket_references(comment["text"]),
+            ) for comment in comments],
         ),
     )
     return html(str(page))
