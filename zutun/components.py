@@ -103,7 +103,10 @@ class TicketDetail(Component):
     """
     <div class="ticket-view split-view">
     <article class="main">
-    <header><h3>{number} <strong>{title}</strong></h3></header>
+    <header>
+        <button hx-get="/tickets/{id}/edit" hx-target="#popoverholder">Edit</button>
+        <h3>{id} <strong>{title}</strong></h3>
+    </header>
     {summary}
     <footer>{comments}</footer>
     </article>
@@ -166,9 +169,9 @@ class Dialog(Component):
     """
 
 
-class NewTicketForm(Component):
+class TicketForm(Component):
     """
-    <form hx-post="/tickets/new">
+    <form hx-post="{endpoint}">
     <fieldset>
     <label>
         Summary
@@ -176,6 +179,7 @@ class NewTicketForm(Component):
             name="summary"
             placeholder="Ticket summary"
             autocomplete="off"
+            value="{summary}"
         >
     </label>
     <label>
@@ -184,7 +188,7 @@ class NewTicketForm(Component):
             name="description"
             placeholder="Longer description..."
             autocomplete="off"
-        ></textarea>
+        >{description}</textarea>
     </label>
     <label>
         Assignee
@@ -192,12 +196,13 @@ class NewTicketForm(Component):
             name="assignee"
             placeholder="Someone"
             autocomplete="off"
+            value="{assignee}"
         >
     </label>
     </fieldset>
     <input
         type="submit"
-        value="Create"
+        value="Submit"
     >
     </form>
     """

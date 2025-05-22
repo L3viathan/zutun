@@ -85,7 +85,7 @@ dialog {
   }
 }
 
-h2 button, .ticket-card button {
+header button, h2 button, .ticket-card button {
   float: right;
   margin-top: 0;
   border-color: gray;

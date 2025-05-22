@@ -19,7 +19,13 @@ async def board(request):
             columns=[
                 KanbanColumn(
                     name=state,
-                    items=[TicketCard.from_row(row) for row in conn.execute("SELECT * FROM tasks WHERE state = ?", (state,)).fetchall()] or NoTicketsPlaceholder(),
+                    items=[
+                        TicketCard.from_row(row)
+                        for row in conn.execute(
+                            "SELECT * FROM tasks WHERE state = ?",
+                            (state,),
+                        ).fetchall()
+                    ] or NoTicketsPlaceholder(),
                 )
                 for state in ["ToDo", "Ongoing", "Blocked", "Done"]
             ],
@@ -79,8 +85,8 @@ async def view_ticket(request, ticket_id: int):
     page = Page(
         title=f"{ticket['id']} - {ticket['summary']}",
         body=TicketDetail(
+            id=ticket["id"],
             title=ticket["summary"],
-            number=ticket["id"],
             summary=ticket["description"],
             properties=[TicketProperty(key=key, value=ticket[key]) for key in ("assignee", "storypoints", "state")],
         ),
@@ -92,8 +98,37 @@ async def view_ticket(request, ticket_id: int):
 async def new_ticket_form(request):
     return html(str(Dialog(
         title="New ticket",
-        content=NewTicketForm(),
+        content=TicketForm(endpoint="/tickets/new"),
     )))
+
+
+@app.get("/tickets/<ticket_id>/edit")
+async def edit_ticket_form(request, ticket_id: int):
+    ticket = conn.execute("SELECT * FROM tasks WHERE id = ?", (ticket_id,)).fetchone()
+    return html(str(Dialog(
+        title="Edit ticket",
+        content=TicketForm(
+            endpoint=f"/tickets/{ticket_id}/edit",
+            **ticket,
+        ),
+    )))
+
+
+@app.post("/tickets/<ticket_id>/edit")
+async def edit_ticket(request, ticket_id: int):
+    data = D(request.form)
+    conn.execute(
+        "UPDATE tasks SET summary=?, description=?, assignee=?, storypoints=? WHERE id=?",
+        (
+            data["summary"],
+            data.get("description"),
+            data.get("assignee"),
+            data.get("storypoints"),
+            ticket_id,
+        ),
+    )
+    conn.commit()
+    return html("", headers={"HX-Refresh": "true"})
 
 
 @app.post("/finish-sprint")
