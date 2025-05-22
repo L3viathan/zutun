@@ -1,14 +1,47 @@
 import re
+import os
+import base64
 from importlib.resources import files
 
 from sanic import Sanic
-from sanic.response import html, file, redirect
+from sanic.response import html, file, redirect, HTTPResponse
 
 from zutun.components import *
 from zutun.db import conn
 
 
 app = Sanic("zutun")
+
+
+CORRECT_AUTH = os.environ["ZUTUN_CREDS"]
+
+@app.on_request
+async def auth(request):
+    cookie = request.cookies.get("auth")
+    if cookie == CORRECT_AUTH:
+        return
+    try:
+        auth = request.headers["Authorization"]
+        _, _, encoded = auth.partition(" ")
+        if base64.b64decode(encoded).decode() == CORRECT_AUTH:
+            response = redirect("/")
+            response.add_cookie(
+                "auth",
+                CORRECT_AUTH,
+                secure=True,
+                httponly=True,
+                    samesite="Strict",
+                    max_age=60*60*24*365,  # roughly one year
+            )
+            return response
+        else:
+            raise ValueError
+    except (KeyError, AssertionError, ValueError):
+        return HTTPResponse(
+            body="401 Unauthorized",
+            status=401,
+            headers={"WWW-Authenticate": 'Basic realm="Zutun access"'},
+        )
 
 REF_PATTERN = re.compile(r"#(\d+)\b")
 
@@ -17,22 +50,26 @@ def D(multival_dict):
 
 @app.get("/")
 async def board(request):
+    columns = []
+    for state in STATES:
+        tickets = conn.execute(
+            "SELECT * FROM tasks WHERE state = ?",
+            (state,),
+        ).fetchall()
+        columns.append(
+            KanbanColumn(
+                name=state,
+                items=[
+                    TicketCard.from_row(row, draggable=True)
+                    for row in tickets
+                ] or NoTicketsPlaceholder(),
+                total=sum(ticket["storypoints"] or 0 for ticket in tickets),
+            )
+        )
     page = Page(
         title="zutun — Board",
         body=Kanban(
-            columns=[
-                KanbanColumn(
-                    name=state,
-                    items=[
-                        TicketCard.from_row(row, draggable=True)
-                        for row in conn.execute(
-                            "SELECT * FROM tasks WHERE state = ?",
-                            (state,),
-                        ).fetchall()
-                    ] or NoTicketsPlaceholder(),
-                )
-                for state in STATES
-            ],
+            columns=columns,
         ),
     )
     return html(str(page))
@@ -49,6 +86,7 @@ async def backlog(request):
     page = Page(
         title="zutun — Backlog",
         body=Backlog(
+            n_items=len(items),
             items=items or NoTicketsPlaceholder(),
         ),
     )
@@ -77,6 +115,8 @@ def _replace_ticket_ref(match):
 
 
 def replace_ticket_references(text):
+    if not text:
+        return text
     return REF_PATTERN.sub(_replace_ticket_ref, text)
 
 
@@ -96,7 +136,7 @@ async def view_ticket(request, ticket_id: int):
         body=TicketDetail(
             id=ticket["id"],
             title=ticket["summary"],
-            summary=replace_ticket_references(ticket["description"]),
+            description=Description(replace_ticket_references(ticket["description"])),
             properties=props,
             comments=[Comment(
                 created_at=comment["created_at"],

@@ -4,14 +4,21 @@ from collections import defaultdict
 STATES = ["ToDo", "Ongoing", "Blocked", "Done"]
 
 
+def coalesce(*args):
+    for arg in args:
+        if arg is not None:
+            return arg
+
+
 class Component:
     sep = ""
+    default = defaultdict(str)
     def __init__(self, *args, **kwargs):
         self.kwargs = defaultdict(
             str,
             {
-                **{f"_{i}": arg or "" for i, arg in enumerate(args)},
-                 **{k: v or "" for k, v in kwargs.items()}
+                **{f"_{i}": coalesce(arg, self.default[i]) for i, arg in enumerate(args)},
+                 **{k: coalesce(v, self.default[k]) for k, v in kwargs.items()}
             },
         )
 
@@ -48,7 +55,7 @@ class Kanban(Component):
 
 class Backlog(Component):
     """
-    <h2>Backlog</h2>
+    <h2>Backlog <small>({n_items})</small></h2>
     <article class="backlog">
       {items}
     </article>
@@ -66,7 +73,7 @@ class NoTicketsPlaceholder(Component):
 class KanbanColumn(Component):
     """
     <div class="kanban-col kanban-col-{name}">
-      <h4>{name}</h4>
+      <h4>{name} <small>({total})</small></h4>
       <hr>
       <div class="kanban-col-items" hx-drop='{{"state": "{name}"}}' hx-drop-action="/tickets/state">
         {items}
@@ -89,7 +96,7 @@ class TicketCard(Component):
         data = {
             "id": row["id"],
             "summary": row["summary"],
-            "details": [row["assignee"], Storypoints(row["storypoints"])],
+            "details": [Assignee(row["assignee"]), Storypoints(row["storypoints"])],
         }
         if with_select_button:
             data["buttons"] = SelectButton(id=row["id"])
@@ -111,7 +118,7 @@ class TicketDetail(Component):
         <button hx-get="/tickets/{id}/edit" hx-target="#popoverholder">Edit</button>
         <h3><span class="id">{id}</span> <strong>{title}</strong></h3>
     </header>
-    {summary}
+    {description}
     <footer>
     {comments}
     <form hx-post="/tickets/{id}/comments">
@@ -233,6 +240,20 @@ class TicketForm(Component):
 
 class Storypoints(Component):
     """<span class="storypoints">{_0}</span>"""
+
+    default = {0: " – "}
+
+
+class Assignee(Component):
+    """<span class="assignee">{_0}</span>"""
+
+    default = {0: "<em>unassigned</em>"}
+
+
+class Description(Component):
+    """<span class="description">{_0}</span>"""
+
+    default = {0: "<em>(no description)</em>"}
 
 
 class StateSelector(Component):
