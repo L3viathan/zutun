@@ -20,7 +20,7 @@ async def board(request):
                 KanbanColumn(
                     name=state,
                     items=[
-                        TicketCard.from_row(row)
+                        TicketCard.from_row(row, draggable=True)
                         for row in conn.execute(
                             "SELECT * FROM tasks WHERE state = ?",
                             (state,),
@@ -38,7 +38,6 @@ async def board(request):
 async def backlog(request):
     items = []
     for i, t in enumerate(conn.execute("SELECT * FROM tasks WHERE state IS NULL").fetchall()):
-        items.append(PositionDropTarget(pos=i))
         items.append(TicketCard.from_row(
             t,
             with_select_button=True,
@@ -50,15 +49,6 @@ async def backlog(request):
         ),
     )
     return html(str(page))
-
-
-@app.put("/backlog/reorder")
-async def reorder_backlog(request):
-    data = D(request.form)
-    ticket_id = int(data["ticket"])
-    pos = data["position"]
-    tickets[ticket_id]["pos"] = pos
-    return html("", headers={"HX-Refresh": "true"})
 
 
 @app.put("/tickets/state")
@@ -82,13 +72,20 @@ async def view_ticket(request, ticket_id: int):
     ticket = conn.execute("SELECT * FROM tasks WHERE id = ?", (ticket_id,)).fetchone()
     if not ticket:
         return redirect("/")
+    props = []
+    if ticket["assignee"]:
+        props.append(TicketProperty("Assignee", ticket["assignee"]))
+    if ticket["storypoints"]:
+        props.append(TicketProperty("Storypoints", Storypoints(ticket["storypoints"])))
+    if ticket["state"]:
+        props.append(TicketProperty("State", ticket["state"]))
     page = Page(
         title=f"{ticket['id']} - {ticket['summary']}",
         body=TicketDetail(
             id=ticket["id"],
             title=ticket["summary"],
             summary=ticket["description"],
-            properties=[TicketProperty(key=key, value=ticket[key]) for key in ("assignee", "storypoints", "state")],
+            properties=props,
         ),
     )
     return html(str(page))

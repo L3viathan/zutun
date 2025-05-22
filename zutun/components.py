@@ -3,8 +3,11 @@ from collections import defaultdict
 
 class Component:
     sep = ""
-    def __init__(self, **kwargs):
-        self.kwargs = defaultdict(str, kwargs)
+    def __init__(self, *args, **kwargs):
+        self.kwargs = defaultdict(
+            str,
+            {**{f"_{i}": arg for i, arg in enumerate(args)}, **kwargs},
+        )
 
     def __repr__(self):
         parts = []
@@ -54,12 +57,6 @@ class NoTicketsPlaceholder(Component):
     """
 
 
-class PositionDropTarget(Component):
-    """
-    <hr hx-drop='{{"position": "{pos}"}}' hx-drop-action="/backlog/reorder">
-    """
-
-
 class KanbanColumn(Component):
     """
     <div class="kanban-col kanban-col-{name}">
@@ -74,22 +71,23 @@ class KanbanColumn(Component):
 
 class TicketCard(Component):
     """
-    <article class="ticket-card" hx-ext="drag" hx-drag='{{"ticket": "{id}"}}' draggable="true">
+    <article class="ticket-card" hx-drag='{{"ticket": "{id}"}}' draggable="{draggable}">
       {buttons}
-      <a href="/tickets/{id}">{id} <strong>{summary}</strong></a><br>
+      <a href="/tickets/{id}"><span class="id">{id}</span> <strong>{summary}</strong></a><br>
       <small>{details}</small>
     </article>
     """
 
     @classmethod
-    def from_row(cls, row, with_select_button=False):
+    def from_row(cls, row, with_select_button=False, draggable=False):
         data = {
             "id": row["id"],
             "summary": row["summary"],
-            "details": [row["assignee"], row["storypoints"]],
+            "details": [row["assignee"], Storypoints(row["storypoints"])],
         }
         if with_select_button:
             data["buttons"] = SelectButton(id=row["id"])
+        data["draggable"] = str(draggable).lower()
         return cls(**data)
 
     sep = " · "
@@ -105,7 +103,7 @@ class TicketDetail(Component):
     <article class="main">
     <header>
         <button hx-get="/tickets/{id}/edit" hx-target="#popoverholder">Edit</button>
-        <h3>{id} <strong>{title}</strong></h3>
+        <h3><span class="id">{id}</span> <strong>{title}</strong></h3>
     </header>
     {summary}
     <footer>{comments}</footer>
@@ -119,7 +117,7 @@ class TicketDetail(Component):
 
 class TicketProperty(Component):
     """
-    <p><strong>{key}:</strong> {value}</p>
+    <p><strong>{_0}:</strong> {_1}</p>
     """
 
 
@@ -199,6 +197,16 @@ class TicketForm(Component):
             value="{assignee}"
         >
     </label>
+    <label>
+        Storypoints
+        <input
+            name="storypoints"
+            placeholder="0"
+            autocomplete="off"
+            value="{storypoints}"
+            type="numeric"
+        >
+    </label>
     </fieldset>
     <input
         type="submit"
@@ -206,3 +214,7 @@ class TicketForm(Component):
     >
     </form>
     """
+
+
+class Storypoints(Component):
+    """<span class="storypoints">{_0}</span>"""
