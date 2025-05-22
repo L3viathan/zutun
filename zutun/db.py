@@ -57,4 +57,16 @@ def initial(cur):
         )
     """)
 
+
+@migration(1)
+def add_comments(cur):
+    cur.execute("""
+        CREATE TABLE comments (
+            id INTEGER PRIMARY KEY,
+            task_id INTEGER NOT NULL,
+            text TEXT,
+            created_at TIMESTAMP DEFAULT (datetime('now'))
+        )
+    """)
+
 conn.isolation_level = orig_isolation_level

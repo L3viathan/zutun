@@ -1,12 +1,18 @@
 from collections import defaultdict
 
 
+STATES = ["ToDo", "Ongoing", "Blocked", "Done"]
+
+
 class Component:
     sep = ""
     def __init__(self, *args, **kwargs):
         self.kwargs = defaultdict(
             str,
-            {**{f"_{i}": arg for i, arg in enumerate(args)}, **kwargs},
+            {
+                **{f"_{i}": arg or "" for i, arg in enumerate(args)},
+                 **{k: v or "" for k, v in kwargs.items()}
+            },
         )
 
     def __repr__(self):
@@ -106,7 +112,16 @@ class TicketDetail(Component):
         <h3><span class="id">{id}</span> <strong>{title}</strong></h3>
     </header>
     {summary}
-    <footer>{comments}</footer>
+    <footer>
+    {comments}
+    <form hx-post="/tickets/{id}/comments">
+    <input
+        placeholder="Add a new comment..."
+        name="comment"
+        autocomplete="off"
+    >
+    </form>
+    </footer>
     </article>
     <div class="sidebar">
     {properties}
@@ -218,3 +233,39 @@ class TicketForm(Component):
 
 class Storypoints(Component):
     """<span class="storypoints">{_0}</span>"""
+
+
+class StateSelector(Component):
+    """
+    <form>
+    <input type="hidden" name="ticket" value="{ticket_id}">
+    <select name="state" hx-put="/tickets/state">
+        {options}
+    </select>
+    </form>
+    """
+
+    @classmethod
+    def from_ticket(cls, ticket):
+        return cls(
+            ticket_id=ticket["id"],
+            options=[
+                StateOption(
+                    state=state,
+                    selected="selected" if state == ticket["state"] else "",
+                )
+                for state in STATES
+            ],
+        )
+
+
+class StateOption(Component):
+    """<option {selected}>{state}</option>"""
+
+
+class Comment(Component):
+    """
+    <div class="comment">
+    <em>{created_at}</em>: {text}
+    </div><hr>
+    """

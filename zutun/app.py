@@ -27,7 +27,7 @@ async def board(request):
                         ).fetchall()
                     ] or NoTicketsPlaceholder(),
                 )
-                for state in ["ToDo", "Ongoing", "Blocked", "Done"]
+                for state in STATES
             ],
         ),
     )
@@ -70,15 +70,14 @@ async def select_ticket(request, ticket_id: int):
 @app.get("/tickets/<ticket_id>")
 async def view_ticket(request, ticket_id: int):
     ticket = conn.execute("SELECT * FROM tasks WHERE id = ?", (ticket_id,)).fetchone()
+    comments = conn.execute("SELECT * FROM comments WHERE task_id = ?", (ticket_id,)).fetchall()
     if not ticket:
         return redirect("/")
-    props = []
+    props = [StateSelector.from_ticket(ticket)]
     if ticket["assignee"]:
         props.append(TicketProperty("Assignee", ticket["assignee"]))
     if ticket["storypoints"]:
         props.append(TicketProperty("Storypoints", Storypoints(ticket["storypoints"])))
-    if ticket["state"]:
-        props.append(TicketProperty("State", ticket["state"]))
     page = Page(
         title=f"{ticket['id']} - {ticket['summary']}",
         body=TicketDetail(
@@ -86,6 +85,7 @@ async def view_ticket(request, ticket_id: int):
             title=ticket["summary"],
             summary=ticket["description"],
             properties=props,
+            comments=[Comment(**comment) for comment in comments],
         ),
     )
     return html(str(page))
@@ -109,6 +109,20 @@ async def edit_ticket_form(request, ticket_id: int):
             **ticket,
         ),
     )))
+
+
+@app.post("/tickets/<ticket_id>/comments")
+async def post_comment(request, ticket_id: int):
+    data = D(request.form)
+    conn.execute(
+        "INSERT INTO comments (task_id, text) VALUES (?, ?)",
+        (
+            ticket_id,
+            data["comment"],
+        ),
+    )
+    conn.commit()
+    return html("", headers={"HX-Refresh": "true"})
 
 
 @app.post("/tickets/<ticket_id>/edit")
