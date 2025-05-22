@@ -111,3 +111,9 @@ header button, h2 button, .ticket-card button {
     content: "#";
   }
 }
+
+.ticket-link {
+  border: 2px solid #2889be;
+  border-radius: 5px;
+  padding: 2px;
+}

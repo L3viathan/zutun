@@ -1,4 +1,6 @@
+import re
 from importlib.resources import files
+
 from sanic import Sanic
 from sanic.response import html, file, redirect
 
@@ -7,6 +9,8 @@ from zutun.db import conn
 
 
 app = Sanic("zutun")
+
+REF_PATTERN = re.compile(r"#(\d+)\b")
 
 def D(multival_dict):
     return {key: val[0] for key, val in multival_dict.items()}
@@ -67,6 +71,15 @@ async def select_ticket(request, ticket_id: int):
     return html("", headers={"HX-Refresh": "true"})
 
 
+def _replace_ticket_ref(match):
+    ticket = conn.execute("SELECT * FROM tasks WHERE id = ?", (int(match.group(1)),)).fetchone()
+    return str(TicketLink(**ticket))
+
+
+def replace_ticket_references(text):
+    return REF_PATTERN.sub(_replace_ticket_ref, text)
+
+
 @app.get("/tickets/<ticket_id>")
 async def view_ticket(request, ticket_id: int):
     ticket = conn.execute("SELECT * FROM tasks WHERE id = ?", (ticket_id,)).fetchone()
@@ -83,7 +96,7 @@ async def view_ticket(request, ticket_id: int):
         body=TicketDetail(
             id=ticket["id"],
             title=ticket["summary"],
-            summary=ticket["description"],
+            summary=replace_ticket_references(ticket["description"]),
             properties=props,
             comments=[Comment(**comment) for comment in comments],
         ),

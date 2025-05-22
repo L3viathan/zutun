@@ -269,3 +269,9 @@ class Comment(Component):
     <em>{created_at}</em>: {text}
     </div><hr>
     """
+
+
+class TicketLink(Component):
+    """
+    <a href="/tickets/{id}" class="ticket-link"><span class="id">{id}</span> {summary}</a>
+    """
