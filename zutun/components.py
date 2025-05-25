@@ -143,6 +143,22 @@ class TaskProperty(Component):
     """
 
 
+class Widget(Component):
+    """
+    <!DOCTYPE html>
+    <html data-theme="light">
+    <head>
+        <title>{title}</title>
+        <link rel="stylesheet" href="/style.css">
+        <link rel="stylesheet" href="/pico.min.css">
+    </head>
+    <body class="fluid-container">
+        {body}
+    </body>
+    </html>
+    """
+
+
 class Page(Component):
     """
     <!DOCTYPE html>

@@ -48,6 +48,23 @@ REF_PATTERN = re.compile(r"#(\d+)\b")
 def D(multival_dict):
     return {key: val[0] for key, val in multival_dict.items()}
 
+
+@app.get("/widget/<states>")
+async def widget(request, states):
+    states = states.split(",")
+    conds = " OR ".join("state = ?" for _ in range(len(states)))
+    tasks = conn.execute(
+        f"SELECT * FROM tasks WHERE {conds}",
+        tuple(states),
+    ).fetchall()
+    return html(str(Widget(
+        body=[
+            TaskCard.from_row(row, draggable=True)
+            for row in tasks
+        ] or NoTasksPlaceholder(),
+    )))
+
+
 @app.get("/")
 async def board(request):
     columns = []
