@@ -52,7 +52,7 @@ def D(multival_dict):
 async def board(request):
     columns = []
     for state in STATES:
-        tickets = conn.execute(
+        tasks = conn.execute(
             "SELECT * FROM tasks WHERE state = ?",
             (state,),
         ).fetchall()
@@ -60,10 +60,10 @@ async def board(request):
             KanbanColumn(
                 name=state,
                 items=[
-                    TicketCard.from_row(row, draggable=True)
-                    for row in tickets
-                ] or NoTicketsPlaceholder(),
-                total=sum(ticket["storypoints"] or 0 for ticket in tickets),
+                    TaskCard.from_row(row, draggable=True)
+                    for row in tasks
+                ] or NoTasksPlaceholder(),
+                total=sum(task["storypoints"] or 0 for task in tasks),
             )
         )
     page = Page(
@@ -79,7 +79,7 @@ async def board(request):
 async def backlog(request):
     items = []
     for i, t in enumerate(conn.execute("SELECT * FROM tasks WHERE state IS NULL").fetchall()):
-        items.append(TicketCard.from_row(
+        items.append(TaskCard.from_row(
             t,
             with_select_button=True,
         ))
@@ -87,93 +87,93 @@ async def backlog(request):
         title="zutun — Backlog",
         body=Backlog(
             n_items=len(items),
-            items=items or NoTicketsPlaceholder(),
+            items=items or NoTasksPlaceholder(),
         ),
     )
     return html(str(page))
 
 
-@app.put("/tickets/state")
+@app.put("/tasks/state")
 async def change_state(request):
     data = D(request.form)
-    ticket_id = int(data["ticket"])
-    conn.execute("UPDATE tasks SET state=? WHERE id=?", (data["state"], ticket_id))
+    task_id = int(data["task"])
+    conn.execute("UPDATE tasks SET state=? WHERE id=?", (data["state"], task_id))
     conn.commit()
     return html("", headers={"HX-Refresh": "true"})
 
 
-@app.post("/tickets/<ticket_id>/select")
-async def select_ticket(request, ticket_id: int):
-    conn.execute("UPDATE tasks SET state=? WHERE id=?", ("ToDo", ticket_id))
+@app.post("/tasks/<task_id>/select")
+async def select_task(request, task_id: int):
+    conn.execute("UPDATE tasks SET state=? WHERE id=?", ("ToDo", task_id))
     conn.commit()
     return html("", headers={"HX-Refresh": "true"})
 
 
-def _replace_ticket_ref(match):
-    ticket = conn.execute("SELECT * FROM tasks WHERE id = ?", (int(match.group(1)),)).fetchone()
-    return str(TicketLink(**ticket))
+def _replace_task_ref(match):
+    task = conn.execute("SELECT * FROM tasks WHERE id = ?", (int(match.group(1)),)).fetchone()
+    return str(TaskLink(**task))
 
 
-def replace_ticket_references(text):
+def replace_task_references(text):
     if not text:
         return text
-    return REF_PATTERN.sub(_replace_ticket_ref, text)
+    return REF_PATTERN.sub(_replace_task_ref, text)
 
 
-@app.get("/tickets/<ticket_id>")
-async def view_ticket(request, ticket_id: int):
-    ticket = conn.execute("SELECT * FROM tasks WHERE id = ?", (ticket_id,)).fetchone()
-    comments = conn.execute("SELECT * FROM comments WHERE task_id = ?", (ticket_id,)).fetchall()
-    if not ticket:
+@app.get("/tasks/<task_id>")
+async def view_task(request, task_id: int):
+    task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    comments = conn.execute("SELECT * FROM comments WHERE task_id = ?", (task_id,)).fetchall()
+    if not task:
         return redirect("/")
-    props = [StateSelector.from_ticket(ticket)]
-    if ticket["assignee"]:
-        props.append(TicketProperty("Assignee", ticket["assignee"]))
-    if ticket["storypoints"]:
-        props.append(TicketProperty("Storypoints", Storypoints(ticket["storypoints"])))
+    props = [StateSelector.from_task(task)]
+    if task["assignee"]:
+        props.append(TaskProperty("Assignee", task["assignee"]))
+    if task["storypoints"]:
+        props.append(TaskProperty("Storypoints", Storypoints(task["storypoints"])))
     page = Page(
-        title=f"{ticket['id']} - {ticket['summary']}",
-        body=TicketDetail(
-            id=ticket["id"],
-            title=ticket["summary"],
-            description=Description(replace_ticket_references(ticket["description"])),
+        title=f"{task['id']} - {task['summary']}",
+        body=TaskDetail(
+            id=task["id"],
+            title=task["summary"],
+            description=Description(replace_task_references(task["description"])),
             properties=props,
             comments=[Comment(
                 created_at=comment["created_at"],
-                text=replace_ticket_references(comment["text"]),
+                text=replace_task_references(comment["text"]),
             ) for comment in comments],
         ),
     )
     return html(str(page))
 
 
-@app.get("/tickets/new")
-async def new_ticket_form(request):
+@app.get("/tasks/new")
+async def new_task_form(request):
     return html(str(Dialog(
-        title="New ticket",
-        content=TicketForm(endpoint="/tickets/new"),
+        title="New task",
+        content=TaskForm(endpoint="/tasks/new"),
     )))
 
 
-@app.get("/tickets/<ticket_id>/edit")
-async def edit_ticket_form(request, ticket_id: int):
-    ticket = conn.execute("SELECT * FROM tasks WHERE id = ?", (ticket_id,)).fetchone()
+@app.get("/tasks/<task_id>/edit")
+async def edit_task_form(request, task_id: int):
+    task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     return html(str(Dialog(
-        title="Edit ticket",
-        content=TicketForm(
-            endpoint=f"/tickets/{ticket_id}/edit",
-            **ticket,
+        title="Edit task",
+        content=TaskForm(
+            endpoint=f"/tasks/{task_id}/edit",
+            **task,
         ),
     )))
 
 
-@app.post("/tickets/<ticket_id>/comments")
-async def post_comment(request, ticket_id: int):
+@app.post("/tasks/<task_id>/comments")
+async def post_comment(request, task_id: int):
     data = D(request.form)
     conn.execute(
         "INSERT INTO comments (task_id, text) VALUES (?, ?)",
         (
-            ticket_id,
+            task_id,
             data["comment"],
         ),
     )
@@ -181,8 +181,8 @@ async def post_comment(request, ticket_id: int):
     return html("", headers={"HX-Refresh": "true"})
 
 
-@app.post("/tickets/<ticket_id>/edit")
-async def edit_ticket(request, ticket_id: int):
+@app.post("/tasks/<task_id>/edit")
+async def edit_task(request, task_id: int):
     data = D(request.form)
     conn.execute(
         "UPDATE tasks SET summary=?, description=?, assignee=?, storypoints=? WHERE id=?",
@@ -191,7 +191,7 @@ async def edit_ticket(request, ticket_id: int):
             data.get("description"),
             data.get("assignee"),
             data.get("storypoints"),
-            ticket_id,
+            task_id,
         ),
     )
     conn.commit()
@@ -207,8 +207,8 @@ async def finish_sprint(request):
     return html("", headers={"HX-Location": "/backlog"})
 
 
-@app.post("/tickets/new")
-async def new_ticket(request):
+@app.post("/tasks/new")
+async def new_task(request):
     data = D(request.form)
     conn.execute(
         "INSERT INTO tasks (summary, description, assignee, storypoints) VALUES (?, ?, ?, ?)",

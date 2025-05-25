@@ -62,10 +62,10 @@ class Backlog(Component):
     """
 
 
-class NoTicketsPlaceholder(Component):
+class NoTasksPlaceholder(Component):
     """
-    <div class="no-tickets-placeholder">
-      (No tickets here)
+    <div class="no-tasks-placeholder">
+      (No tasks here)
     </div>
     """
 
@@ -75,18 +75,18 @@ class KanbanColumn(Component):
     <div class="kanban-col kanban-col-{name}">
       <h4>{name} <small>({total})</small></h4>
       <hr>
-      <div class="kanban-col-items" hx-drop='{{"state": "{name}"}}' hx-drop-action="/tickets/state">
+      <div class="kanban-col-items" hx-drop='{{"state": "{name}"}}' hx-drop-action="/tasks/state">
         {items}
       </div>
     </div>
     """
 
 
-class TicketCard(Component):
+class TaskCard(Component):
     """
-    <article class="ticket-card" hx-drag='{{"ticket": "{id}"}}' draggable="{draggable}">
+    <article class="task-card" hx-drag='{{"task": "{id}"}}' draggable="{draggable}">
       {buttons}
-      <a href="/tickets/{id}"><span class="id">{id}</span> <strong>{summary}</strong></a><br>
+      <a href="/tasks/{id}"><span class="id">{id}</span> <strong>{summary}</strong></a><br>
       <small>{details}</small>
     </article>
     """
@@ -107,21 +107,21 @@ class TicketCard(Component):
 
 
 class SelectButton(Component):
-    """<button hx-post="/tickets/{id}/select">Select</button>"""
+    """<button hx-post="/tasks/{id}/select">Select</button>"""
 
 
-class TicketDetail(Component):
+class TaskDetail(Component):
     """
-    <div class="ticket-view split-view">
+    <div class="task-view split-view">
     <article class="main">
     <header>
-        <button hx-get="/tickets/{id}/edit" hx-target="#popoverholder">Edit</button>
+        <button hx-get="/tasks/{id}/edit" hx-target="#popoverholder">Edit</button>
         <h3><span class="id">{id}</span> <strong>{title}</strong></h3>
     </header>
     {description}
     <footer>
     {comments}
-    <form hx-post="/tickets/{id}/comments">
+    <form hx-post="/tasks/{id}/comments">
     <input
         placeholder="Add a new comment..."
         name="comment"
@@ -137,7 +137,7 @@ class TicketDetail(Component):
     """
 
 
-class TicketProperty(Component):
+class TaskProperty(Component):
     """
     <p><strong>{_0}:</strong> {_1}</p>
     """
@@ -163,7 +163,7 @@ class Page(Component):
                 <li><a href="/backlog">Backlog</a></li>
             </ul>
             <ul>
-                <li><button hx-get="/tickets/new" hx-target="#popoverholder">New ticket</button></li>
+                <li><button hx-get="/tasks/new" hx-target="#popoverholder">New task</button></li>
                 <li><input type="search"></li>
             </ul>
         </nav>
@@ -189,7 +189,7 @@ class Dialog(Component):
     """
 
 
-class TicketForm(Component):
+class TaskForm(Component):
     """
     <form hx-post="{endpoint}">
     <fieldset>
@@ -197,7 +197,7 @@ class TicketForm(Component):
         Summary
         <input
             name="summary"
-            placeholder="Ticket summary"
+            placeholder="Task summary"
             autocomplete="off"
             value="{summary}"
         >
@@ -259,21 +259,21 @@ class Description(Component):
 class StateSelector(Component):
     """
     <form>
-    <input type="hidden" name="ticket" value="{ticket_id}">
-    <select name="state" hx-put="/tickets/state">
+    <input type="hidden" name="task" value="{task_id}">
+    <select name="state" hx-put="/tasks/state">
         {options}
     </select>
     </form>
     """
 
     @classmethod
-    def from_ticket(cls, ticket):
+    def from_task(cls, task):
         return cls(
-            ticket_id=ticket["id"],
+            task_id=task["id"],
             options=[
                 StateOption(
                     state=state,
-                    selected="selected" if state == ticket["state"] else "",
+                    selected="selected" if state == task["state"] else "",
                 )
                 for state in STATES
             ],
@@ -292,7 +292,7 @@ class Comment(Component):
     """
 
 
-class TicketLink(Component):
+class TaskLink(Component):
     """
-    <a href="/tickets/{id}" class="ticket-link"><span class="id">{id}</span> {summary}</a>
+    <a href="/tasks/{id}" class="task-link"><span class="id">{id}</span> {summary}</a>
     """
