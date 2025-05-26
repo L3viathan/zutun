@@ -1,10 +1,12 @@
 import re
 import os
 import base64
+from io import BytesIO
 from importlib.resources import files
 
+from PIL import Image, ImageDraw
 from sanic import Sanic
-from sanic.response import html, file, redirect, HTTPResponse
+from sanic.response import html, file, redirect, HTTPResponse, raw
 
 from zutun.components import *
 from zutun.db import conn
@@ -57,12 +59,14 @@ async def widget(request, states):
         f"SELECT * FROM tasks WHERE {conds}",
         tuple(states),
     ).fetchall()
-    return html(str(Widget(
-        body=[
-            TaskCard.from_row(row, draggable=True)
-            for row in tasks
-        ] or NoTasksPlaceholder(),
-    )))
+    img = Image.new("RGBA", (600, 800), color=(255, 255, 255, 0))
+    draw = ImageDraw.Draw(img)
+    draw.multiline_text((10, 10), "\n".join(
+        row["summary"] for row in tasks
+    ), font_size=48, fill="black")
+    io = BytesIO()
+    img.save(io, format="png", mode="RGBA")
+    return raw(io.getvalue(), content_type="image/png")
 
 
 @app.get("/")
