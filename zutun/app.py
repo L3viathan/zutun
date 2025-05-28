@@ -17,7 +17,17 @@ app = Sanic("zutun")
 
 CORRECT_AUTH = os.environ["ZUTUN_CREDS"]
 TASK_QUERY = """
-    SELECT *, COUNT(subtask.id) AS n_subtasks
+    SELECT
+        tasks.id AS id,
+        tasks.summary AS summary,
+        tasks.description AS description,
+        tasks.location AS location,
+        tasks.state AS state,
+        tasks.parent_task_id AS parent_task_id,
+        tasks.assignee AS assignee,
+        COALESCE(tasks.storypoints, 0) AS storypoints,
+        COUNT(subtask.id) AS n_subtasks,
+        COALESCE(SUM(subtask.storypoints), 0) AS storypoints_sum
     FROM tasks
     LEFT OUTER JOIN tasks subtask ON subtask.parent_task_id = tasks.id
     WHERE
@@ -88,7 +98,7 @@ def _kanban_columns_from_tasks(tasks):
         columns[task["state"]].append(
             TaskCard.from_row(task, draggable=True),
         )
-        storypoints[task["state"]] += task["storypoints"] or 0
+        storypoints[task["state"]] += (task["storypoints_sum"] or task["storypoints"])
     return KanbanColumns([
         KanbanColumn(
             name=state,

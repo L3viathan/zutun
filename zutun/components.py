@@ -111,7 +111,7 @@ class TaskCard(Component):
     def from_row(cls, row, with_select_button=False, draggable=False):
         details = [
             Assignee(row["assignee"]),
-            Storypoints(row["storypoints"]),
+            Storypoints(row["storypoints_sum"] + row["storypoints"]),
         ]
         if row["n_subtasks"]:
             details.append(f"{row['n_subtasks']} subtasks")
