@@ -16,6 +16,14 @@ app = Sanic("zutun")
 
 
 CORRECT_AUTH = os.environ["ZUTUN_CREDS"]
+TASK_QUERY = """
+    SELECT *, COUNT(subtask.id) AS n_subtasks
+    FROM tasks
+    LEFT OUTER JOIN tasks subtask ON subtask.parent_task_id = tasks.id
+    WHERE
+        {conditions}
+    GROUP BY tasks.id
+"""
 
 @app.on_request
 async def auth(request):
@@ -69,29 +77,40 @@ async def widget(request, states):
     return raw(io.getvalue(), content_type="image/png")
 
 
+def _kanban_columns_from_tasks(tasks):
+    columns = {
+        state: [] for state in STATES
+    }
+    storypoints = {
+        state: 0 for state in STATES
+    }
+    for task in tasks:
+        columns[task["state"]].append(
+            TaskCard.from_row(task, draggable=True),
+        )
+        storypoints[task["state"]] += task["storypoints"] or 0
+    return KanbanColumns([
+        KanbanColumn(
+            name=state,
+            items=columns[state] or NoTasksPlaceholder(),
+            total=storypoints[state],
+        )
+        for state in STATES
+    ])
+
+
 @app.get("/")
 async def board(request):
     columns = []
-    for state in STATES:
-        tasks = conn.execute(
-            "SELECT * FROM tasks WHERE state = ?",
-            (state,),
-        ).fetchall()
-        columns.append(
-            KanbanColumn(
-                name=state,
-                items=[
-                    TaskCard.from_row(row, draggable=True)
-                    for row in tasks
-                ] or NoTasksPlaceholder(),
-                total=sum(task["storypoints"] or 0 for task in tasks),
-            )
-        )
+    tasks = conn.execute(
+        TASK_QUERY.format(conditions="""
+            tasks.location = 'selected'
+            AND tasks.parent_task_id IS NULL
+        """),
+    ).fetchall()
     page = Page(
         title="zutun — Board",
-        body=Kanban(
-            columns=columns,
-        ),
+        body=Kanban(columns=_kanban_columns_from_tasks(tasks)),
     )
     return html(str(page))
 
@@ -99,7 +118,12 @@ async def board(request):
 @app.get("/backlog")
 async def backlog(request):
     items = []
-    for i, t in enumerate(conn.execute("SELECT * FROM tasks WHERE state IS NULL").fetchall()):
+    for i, t in enumerate(conn.execute(
+        TASK_QUERY.format(conditions=
+            """
+            tasks.location = 'backlog' AND tasks.parent_task_id IS NULL
+        """),
+    ).fetchall()):
         items.append(TaskCard.from_row(
             t,
             with_select_button=True,
@@ -125,7 +149,7 @@ async def change_state(request):
 
 @app.post("/tasks/<task_id>/select")
 async def select_task(request, task_id: int):
-    conn.execute("UPDATE tasks SET state=? WHERE id=?", ("ToDo", task_id))
+    conn.execute("UPDATE tasks SET location='selected' WHERE id=?", (task_id,))
     conn.commit()
     return html("", headers={"HX-Refresh": "true"})
 
@@ -145,13 +169,23 @@ def replace_task_references(text):
 async def view_task(request, task_id: int):
     task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     comments = conn.execute("SELECT * FROM comments WHERE task_id = ?", (task_id,)).fetchall()
+    subtasks = conn.execute(
+        TASK_QUERY.format(conditions="""
+            tasks.parent_task_id = ?
+        """),
+        (task_id,),
+    ).fetchall()
     if not task:
         return redirect("/")
     props = [StateSelector.from_task(task)]
+    if not task["parent_task_id"]:
+        props.append(TaskProperty("Location", task["location"]))
     if task["assignee"]:
         props.append(TaskProperty("Assignee", task["assignee"]))
     if task["storypoints"]:
         props.append(TaskProperty("Storypoints", Storypoints(task["storypoints"])))
+    if task["parent_task_id"]:
+        props.append(TaskProperty("Parent task", replace_task_references(f"#{task['parent_task_id']}")))
     page = Page(
         title=f"{task['id']} - {task['summary']}",
         body=TaskDetail(
@@ -163,6 +197,7 @@ async def view_task(request, task_id: int):
                 created_at=comment["created_at"],
                 text=replace_task_references(comment["text"]),
             ) for comment in comments],
+            subtasks=Subtasks(_kanban_columns_from_tasks(subtasks)) if subtasks else None,
         ),
     )
     return html(str(page))
@@ -170,9 +205,13 @@ async def view_task(request, task_id: int):
 
 @app.get("/tasks/new")
 async def new_task_form(request):
+    args = D(request.args)
     return html(str(Dialog(
         title="New task",
-        content=TaskForm(endpoint="/tasks/new"),
+        content=TaskForm(
+            endpoint="/tasks/new",
+            parent_task_id=args.get("parent_task_id"),
+        ),
     )))
 
 
@@ -206,12 +245,13 @@ async def post_comment(request, task_id: int):
 async def edit_task(request, task_id: int):
     data = D(request.form)
     conn.execute(
-        "UPDATE tasks SET summary=?, description=?, assignee=?, storypoints=? WHERE id=?",
+        "UPDATE tasks SET summary=?, description=?, assignee=?, storypoints=?, parent_task_id=? WHERE id=?",
         (
             data["summary"],
             data.get("description"),
             data.get("assignee"),
             data.get("storypoints"),
+            data.get("parent_task_id"),
             task_id,
         ),
     )
@@ -222,8 +262,8 @@ async def edit_task(request, task_id: int):
 @app.post("/finish-sprint")
 async def finish_sprint(request):
     cur = conn.cursor()
-    cur.execute("UPDATE tasks SET state='Closed' WHERE state = 'Done'")
-    cur.execute("UPDATE tasks SET state=NULL WHERE state IS NOT NULL AND state <> 'Closed'")
+    cur.execute("UPDATE tasks SET location='graveyard' WHERE location = 'selected' AND state = 'Done'")
+    cur.execute("UPDATE tasks SET location='backlog' WHERE location = 'selected' AND state <> 'Closed'")
     conn.commit()
     return html("", headers={"HX-Location": "/backlog"})
 
@@ -232,12 +272,13 @@ async def finish_sprint(request):
 async def new_task(request):
     data = D(request.form)
     conn.execute(
-        "INSERT INTO tasks (summary, description, assignee, storypoints) VALUES (?, ?, ?, ?)",
+        "INSERT INTO tasks (summary, description, assignee, storypoints, parent_task_id, state, location) VALUES (?, ?, ?, ?, ?, 'ToDo', 'backlog')",
         (
             data["summary"],
             data.get("description"),
             data.get("assignee"),
             data.get("storypoints"),
+            data.get("parent_task_id"),
         ),
     )
     conn.commit()

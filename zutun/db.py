@@ -69,4 +69,32 @@ def add_comments(cur):
         )
     """)
 
+
+@migration(2)
+def add_parent_task(cur):
+    cur.execute("""
+        ALTER TABLE tasks
+        ADD COLUMN parent_task_id INTEGER
+    """)
+
+
+@migration(3)
+def add_selected_flag(cur):
+    cur.execute("""
+        ALTER TABLE tasks
+        ADD COLUMN location TEXT
+    """)
+    cur.execute("""
+        UPDATE tasks
+        SET location = 'selected' WHERE state IS NOT NULL AND state <> 'Closed'
+    """)
+    cur.execute("""
+        UPDATE tasks
+        SET state='ToDo', location = 'backlog' WHERE state IS NULL
+    """)
+    cur.execute("""
+        UPDATE tasks
+        SET state='Done', location = 'graveyard' WHERE state = 'Closed'
+    """)
+
 conn.isolation_level = orig_isolation_level

@@ -47,9 +47,25 @@ class Kanban(Component):
     <h2>Current sprint
         <button hx-post="/finish-sprint" hx-select="body" hx-target="body" hx-replace="outerHTML" hx-confirm="Are you sure you want to close the sprint?">Finish sprint</button>
     </h2>
-    <article hx-ext="drag" class="grid kanban">
-      {columns}
+    <article>
+    {columns}
     </article>
+    """
+
+
+class Subtasks(Component):
+    """
+    <h4>Subtasks</h4>
+    {_0}
+    <hr>
+    """
+
+
+class KanbanColumns(Component):
+    """
+    <div hx-ext="drag" class="grid kanban">
+      {_0}
+    </div>
     """
 
 
@@ -93,10 +109,16 @@ class TaskCard(Component):
 
     @classmethod
     def from_row(cls, row, with_select_button=False, draggable=False):
+        details = [
+            Assignee(row["assignee"]),
+            Storypoints(row["storypoints"]),
+        ]
+        if row["n_subtasks"]:
+            details.append(f"{row['n_subtasks']} subtasks")
         data = {
             "id": row["id"],
             "summary": row["summary"],
-            "details": [Assignee(row["assignee"]), Storypoints(row["storypoints"])],
+            "details": details,
         }
         if with_select_button:
             data["buttons"] = SelectButton(id=row["id"])
@@ -116,10 +138,12 @@ class TaskDetail(Component):
     <article class="main">
     <header>
         <button hx-get="/tasks/{id}/edit" hx-target="#popoverholder">Edit</button>
+        <button hx-get="/tasks/new?parent_task_id={id}" hx-target="#popoverholder">New subtask</button>
         <h3><span class="id">{id}</span> <strong>{title}</strong></h3>
     </header>
     {description}
     <footer>
+    {subtasks}
     {comments}
     <form hx-post="/tasks/{id}/comments">
     <input
@@ -242,6 +266,16 @@ class TaskForm(Component):
             placeholder="0"
             autocomplete="off"
             value="{storypoints}"
+            type="numeric"
+        >
+    </label>
+    <label>
+        Parent task
+        <input
+            name="parent_task_id"
+            placeholder="0"
+            autocomplete="off"
+            value="{parent_task_id}"
             type="numeric"
         >
     </label>
