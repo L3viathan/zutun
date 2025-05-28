@@ -92,6 +92,11 @@ header button, h2 button, .task-card button {
   border-color: gray;
 }
 
+header div[role="group"] {
+  float: right;
+  width: auto;
+}
+
 .no-tasks-placeholder {
   text-align: center;
   padding: 40px;
@@ -118,4 +123,10 @@ header button, h2 button, .task-card button {
   border: 2px solid #2889be;
   border-radius: 5px;
   padding: 2px;
+}
+
+input.input-prefix {
+  width: 36px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
 }

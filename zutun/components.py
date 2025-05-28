@@ -137,8 +137,10 @@ class TaskDetail(Component):
     <div class="task-view split-view">
     <article class="main">
     <header>
-        <button hx-get="/tasks/{id}/edit" hx-target="#popoverholder">Edit</button>
-        <button hx-get="/tasks/new?parent_task_id={id}" hx-target="#popoverholder">New subtask</button>
+        <div role="group">
+            <button hx-get="/tasks/new?parent_task_id={id}" hx-target="#popoverholder">New subtask</button>
+            <button hx-get="/tasks/{id}/edit" hx-target="#popoverholder">Edit</button>
+        </div>
         <h3><span class="id">{id}</span> <strong>{title}</strong></h3>
     </header>
     {description}
@@ -269,15 +271,19 @@ class TaskForm(Component):
             type="numeric"
         >
     </label>
-    <label>
+    <label for="parent_task_id">
         Parent task
+        <fieldset role="group">
+        <input value="#" class="input-prefix" disabled>
         <input
+            id="parent_task_id"
             name="parent_task_id"
             placeholder="0"
             autocomplete="off"
             value="{parent_task_id}"
             type="numeric"
         >
+        </fieldset>
     </label>
     </fieldset>
     <input
