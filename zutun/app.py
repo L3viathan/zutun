@@ -378,7 +378,7 @@ async def edit_task(request, task_id: int):
         (
             data["summary"],
             data.get("description"),
-            data.get("assignee_id"),
+            data.get("assignee_id") or None,
             data.get("storypoints"),
             data.get("parent_task_id"),
             task_id,
@@ -401,11 +401,11 @@ async def finish_sprint(request):
 async def new_task(request):
     data = D(request.form)
     conn.execute(
-        "INSERT INTO tasks (summary, description, assignee, storypoints, parent_task_id, state, location) VALUES (?, ?, ?, ?, ?, 'ToDo', 'backlog')",
+        "INSERT INTO tasks (summary, description, assignee_id, storypoints, parent_task_id, state, location) VALUES (?, ?, ?, ?, ?, 'ToDo', 'backlog')",
         (
             data["summary"],
             data.get("description"),
-            data.get("assignee"),
+            data.get("assignee_id") or None,
             data.get("storypoints"),
             data.get("parent_task_id"),
         ),
