@@ -111,10 +111,12 @@ def add_users(cur):
 
 @migration(5)
 def reset_assignees(cur):
-    cur.execute("""
-        ALTER TABLE tasks
-        DROP COLUMN assignee
-    """)
+    # Old SQLite versions (like those on Debian stable) can't drop columns.
+    # We'll just ignore it from now on.
+    # cur.execute("""
+    #     ALTER TABLE tasks
+    #     DROP COLUMN assignee
+    # """)
     cur.execute("""
         ALTER TABLE tasks
         ADD COLUMN assignee_id INTEGER
