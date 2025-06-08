@@ -123,4 +123,12 @@ def reset_assignees(cur):
     """)
 
 
+@migration(6)
+def make_comments_nonanonymous(cur):
+    cur.execute("""
+        ALTER TABLE comments
+        ADD COLUMN commenter_id INTEGER
+    """)
+
+
 conn.isolation_level = orig_isolation_level

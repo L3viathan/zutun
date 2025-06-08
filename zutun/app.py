@@ -194,12 +194,14 @@ async def backlog(request):
             t,
             with_select_button=True,
         ))
+    user = conn.execute("SELECT * FROM users WHERE id=?", (int(request.cookies.get("user")),)).fetchone()
     page = Page(
         title="zutun — Backlog",
         body=Backlog(
             n_items=len(items),
             items=items or NoTasksPlaceholder(),
         ),
+        logout=LogoutBar(**user),
     )
     return html(str(page))
 
@@ -234,20 +236,33 @@ def replace_task_references(text):
 @app.get("/tasks/<task_id>")
 async def view_task(request, task_id: int):
     task = conn.execute(TASK_QUERY.format(conditions="tasks.id = ?"), (task_id,)).fetchone()
-    comments = conn.execute("SELECT * FROM comments WHERE task_id = ?", (task_id,)).fetchall()
+    comments = conn.execute("""
+        SELECT
+            comments.id AS id,
+            comments.task_id AS task_id,
+            comments.text AS text,
+            comments.created_at AS created_at,
+            u.id AS commenter_id,
+            u.name AS commenter_name,
+            u.avatar AS commenter_avatar
+        FROM comments
+        LEFT JOIN users u ON comments.commenter_id = u.id
+        WHERE task_id = ?
+    """, (task_id,)).fetchall()
     subtasks = conn.execute(
         TASK_QUERY.format(conditions="""
             tasks.parent_task_id = ?
         """),
         (task_id,),
     ).fetchall()
+    user = conn.execute("SELECT * FROM users WHERE id=?", (int(request.cookies.get("user")),)).fetchone()
     if not task:
         return redirect("/")
     props = [StateSelector.from_task(task)]
     if not task["parent_task_id"]:
         props.append(TaskProperty("Location", task["location"]))
     if task["assignee_id"]:
-        props.append(TaskProperty("Assignee", Assignee.from_task(task)))
+        props.append(TaskProperty("Assignee", User.from_task(task)))
     if task["storypoints"]:
         props.append(TaskProperty("Storypoints", Storypoints(task["storypoints"])))
     if task["parent_task_id"]:
@@ -260,11 +275,13 @@ async def view_task(request, task_id: int):
             description=Description(replace_task_references(task["description"])),
             properties=props,
             comments=[Comment(
+                commenter=User.from_comment(comment),
                 created_at=comment["created_at"],
                 text=replace_task_references(comment["text"]),
             ) for comment in comments],
             subtasks=Subtasks(_kanban_columns_from_tasks(subtasks)) if subtasks else None,
         ),
+        logout=LogoutBar(**user),
     )
     return html(str(page))
 
@@ -337,12 +354,14 @@ async def edit_task_form(request, task_id: int):
 
 @app.post("/tasks/<task_id>/comments")
 async def post_comment(request, task_id: int):
+    user_id = int(request.cookies.get("user"))
     data = D(request.form)
     conn.execute(
-        "INSERT INTO comments (task_id, text) VALUES (?, ?)",
+        "INSERT INTO comments (task_id, text, commenter_id) VALUES (?, ?, ?)",
         (
             task_id,
             data["comment"],
+            user_id,
         ),
     )
     conn.commit()

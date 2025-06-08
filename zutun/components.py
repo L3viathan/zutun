@@ -135,7 +135,7 @@ class TaskCard(Component):
     @classmethod
     def from_row(cls, row, with_select_button=False, draggable=False):
         details = [
-            Assignee.from_task(row),
+            User.from_task(row),
             Storypoints(row["storypoints_sum"] + row["storypoints"]),
         ]
         if row["n_subtasks"]:
@@ -228,7 +228,6 @@ class LoggedOutPage(Component):
                 <li>zutun</li>
                 <li><a href="/">Board</a></li>
                 <li><a href="/backlog">Backlog</a></li>
-                <li><a href="/users">Users</a></li>
             </ul>
             <ul>
                 <li><button hx-get="/tasks/new" hx-target="#popoverholder">New task</button></li>
@@ -372,17 +371,25 @@ class Storypoints(Component):
     default = {0: " – "}
 
 
-class Assignee(Component):
-    """<span class="assignee {assignee_set}"><img class="avatar" src="{avatar}">{name}</span>"""
+class User(Component):
+    """<span class="user {user_set}"><img class="avatar" src="{avatar}">{name}</span>"""
 
-    default = {"name": "<em>unassigned</em>", "avatar": "", "assignee_set": ""}
+    default = {"name": "<em>unassigned</em>", "avatar": "", "user_set": ""}
 
     @classmethod
     def from_task(cls, task):
         return cls(
             name=task["assignee_name"],
             avatar=task["assignee_avatar"],
-            assignee_set="assignee-set" if task["assignee_id"] else "",
+            user_set="user-set" if task["assignee_id"] else "",
+        )
+
+    @classmethod
+    def from_comment(cls, comment):
+        return cls(
+            name=comment["commenter_name"] or "<em>anonymous</em>",
+            avatar=comment["commenter_avatar"],
+            user_set="user-set" if comment["commenter_id"] else "",
         )
 
 
@@ -423,7 +430,7 @@ class StateOption(Component):
 class Comment(Component):
     """
     <div class="comment">
-    <em>{created_at}</em>: {text}
+    {commenter} <em>{created_at}</em>: {text}
     </div><hr>
     """
 
