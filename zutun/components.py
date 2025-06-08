@@ -430,7 +430,8 @@ class StateOption(Component):
 class Comment(Component):
     """
     <div class="comment">
-    {commenter} <em>{created_at}</em>: {text}
+    {commenter} wrote <em data-tooltip="{created_at}">{created_at_human}</em>:
+    <span class="comment-text">{text}</comment>
     </div><hr>
     """
 

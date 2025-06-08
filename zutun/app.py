@@ -2,9 +2,10 @@ import re
 import os
 import base64
 from io import BytesIO
-from importlib.resources import files
+from datetime import datetime
 
 from PIL import Image
+from humanize import naturaltime
 from sanic import Sanic
 from sanic.response import html, file, redirect, HTTPResponse, raw
 
@@ -277,6 +278,7 @@ async def view_task(request, task_id: int):
             comments=[Comment(
                 commenter=User.from_comment(comment),
                 created_at=comment["created_at"],
+                created_at_human=naturaltime(datetime.fromisoformat(comment["created_at"])),
                 text=replace_task_references(comment["text"]),
             ) for comment in comments],
             subtasks=Subtasks(_kanban_columns_from_tasks(subtasks)) if subtasks else None,

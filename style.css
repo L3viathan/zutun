@@ -155,3 +155,11 @@ nav .avatar {
   padding: 1px 5px 4px 3px;
   border-radius: 12px;
 }
+
+.comment-text {
+  background: #e9f3ff;
+  display: block;
+  padding: 10px;
+  margin: 10px;
+  border-radius: 5px;
+}
