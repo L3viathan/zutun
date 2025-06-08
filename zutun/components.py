@@ -69,6 +69,31 @@ class KanbanColumns(Component):
     """
 
 
+class UserChoice(Component):
+    """
+    <div class="user-card">
+      <img class="avatar" src="{avatar}">
+      <a href="/login-as/{id}"><strong>{name}</strong></a><br>
+    </div>
+    """
+
+
+class UserChoices(Component):
+    """
+    <dialog open closedby="any">
+    <div class="login-selection">
+    <article class="user-card">
+    <header>
+    <h4>Choose user</h4>
+    </header>
+    {_0}
+      <a href="/users/new">+ New user</a><br>
+    </article>
+    </div>
+    </dialog>
+    """
+
+
 class Backlog(Component):
     """
     <h2>Backlog <small>({n_items})</small></h2>
@@ -110,7 +135,7 @@ class TaskCard(Component):
     @classmethod
     def from_row(cls, row, with_select_button=False, draggable=False):
         details = [
-            Assignee(row["assignee"]),
+            Assignee.from_task(row),
             Storypoints(row["storypoints_sum"] + row["storypoints"]),
         ]
         if row["n_subtasks"]:
@@ -185,7 +210,7 @@ class Widget(Component):
     """
 
 
-class Page(Component):
+class LoggedOutPage(Component):
     """
     <!DOCTYPE html>
     <html data-theme="light">
@@ -203,10 +228,12 @@ class Page(Component):
                 <li>zutun</li>
                 <li><a href="/">Board</a></li>
                 <li><a href="/backlog">Backlog</a></li>
+                <li><a href="/users">Users</a></li>
             </ul>
             <ul>
                 <li><button hx-get="/tasks/new" hx-target="#popoverholder">New task</button></li>
                 <li><input type="search"></li>
+                <!- LOGOUT -->
             </ul>
         </nav>
         <main>
@@ -215,6 +242,13 @@ class Page(Component):
     </body>
     </html>
     """
+
+
+class Page(Component):
+    ...
+Page.__doc__ = LoggedOutPage.__doc__.replace("<!- LOGOUT -->", """
+    <li>{logout}</li>
+""")
 
 
 class Dialog(Component):
@@ -228,6 +262,46 @@ class Dialog(Component):
     {content}
     </article>
     </dialog>
+    """
+
+
+class UserForm(Component):
+    """
+    <article>
+    <header>
+    <h4>New user</h4>
+    </header>
+    <form
+        enctype="multipart/form-data"
+        hx-post="{endpoint}"
+    >
+    <fieldset>
+    <label>
+        Name
+        <input
+            name="name"
+            placeholder="Name"
+            autocomplete="off"
+            value="{name}"
+        >
+    </label>
+    <label>
+        Avatar
+        <input name="avatar" type="file"></input>
+    </label>
+    </fieldset>
+    <input
+        type="submit"
+        value="Submit"
+    >
+    </form>
+    </article>
+    """
+
+
+class AssigneeChoice(Component):
+    """
+    <option value="{id}" {selected}>{name}</option>
     """
 
 
@@ -254,12 +328,10 @@ class TaskForm(Component):
     </label>
     <label>
         Assignee
-        <input
-            name="assignee"
-            placeholder="Someone"
-            autocomplete="off"
-            value="{assignee}"
-        >
+        <select name="assignee_id">
+          <option value=""><em>Unassigned</em></option>
+          {assignee_choices}
+        </select>
     </label>
     <label>
         Storypoints
@@ -301,9 +373,17 @@ class Storypoints(Component):
 
 
 class Assignee(Component):
-    """<span class="assignee">{_0}</span>"""
+    """<span class="assignee {assignee_set}"><img class="avatar" src="{avatar}">{name}</span>"""
 
-    default = {0: "<em>unassigned</em>"}
+    default = {"name": "<em>unassigned</em>", "avatar": "", "assignee_set": ""}
+
+    @classmethod
+    def from_task(cls, task):
+        return cls(
+            name=task["assignee_name"],
+            avatar=task["assignee_avatar"],
+            assignee_set="assignee-set" if task["assignee_id"] else "",
+        )
 
 
 class Description(Component):
@@ -351,4 +431,11 @@ class Comment(Component):
 class TaskLink(Component):
     """
     <a href="/tasks/{id}" class="task-link"><span class="id">{id}</span> {summary}</a>
+    """
+
+
+class LogoutBar(Component):
+    """
+    <details class="dropdown"><summary><img class="avatar" src="{avatar}">{name}</summary>
+    <ul><li><a href="/login">Logout</a></li></ul></details>
     """

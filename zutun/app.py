@@ -4,7 +4,7 @@ import base64
 from io import BytesIO
 from importlib.resources import files
 
-from PIL import Image, ImageDraw
+from PIL import Image
 from sanic import Sanic
 from sanic.response import html, file, redirect, HTTPResponse, raw
 
@@ -24,12 +24,16 @@ TASK_QUERY = """
         tasks.location AS location,
         tasks.state AS state,
         tasks.parent_task_id AS parent_task_id,
-        tasks.assignee AS assignee,
+        u.id AS assignee_id,
+        u.name AS assignee_name,
+        u.avatar AS assignee_avatar,
+        tasks.assignee_id AS assignee,
         COALESCE(tasks.storypoints, 0) AS storypoints,
         COUNT(subtask.id) AS n_subtasks,
         COALESCE(SUM(subtask.storypoints), 0) AS storypoints_sum
     FROM tasks
     LEFT OUTER JOIN tasks subtask ON subtask.parent_task_id = tasks.id
+    LEFT JOIN users u ON tasks.assignee_id = u.id
     WHERE
         {conditions}
     GROUP BY tasks.id
@@ -63,28 +67,62 @@ async def auth(request):
             headers={"WWW-Authenticate": 'Basic realm="Zutun access"'},
         )
 
+
+@app.on_request
+async def check_login(request):
+    if hasattr(request.route.handler, "_ignore_login_check"):
+        return
+    user = request.cookies.get("user")
+    if not user:
+        return redirect("/login")
+
+
+def allow_logged_out(fn):
+    fn._ignore_login_check = True
+    return fn
+
+
+@app.get("/login-as/<user>")
+@allow_logged_out
+async def login_as(request, user):
+    response = redirect("/")
+    response.add_cookie(
+        "user",
+        user,
+        secure=True,
+        httponly=True,
+        samesite="Strict",
+        max_age=60*60*24*365,  # roughly one year
+    )
+    return response
+
+
 REF_PATTERN = re.compile(r"#(\d+)\b")
 
 def D(multival_dict):
     return {key: val[0] for key, val in multival_dict.items()}
 
 
-@app.get("/widget/<states>")
-async def widget(request, states):
-    states = states.split(",")
-    conds = " OR ".join("state = ?" for _ in range(len(states)))
-    tasks = conn.execute(
-        f"SELECT * FROM tasks WHERE {conds}",
-        tuple(states),
-    ).fetchall()
-    img = Image.new("RGBA", (600, 800), color=(255, 255, 255, 0))
-    draw = ImageDraw.Draw(img)
-    draw.multiline_text((10, 10), "\n".join(
-        row["summary"] for row in tasks
-    ), font_size=48, fill="black")
-    io = BytesIO()
-    img.save(io, format="png", mode="RGBA")
-    return raw(io.getvalue(), content_type="image/png")
+def scale_image(img, target_size):
+    """
+    Scale image to a fixed, square size.
+
+    When the original image isn't a square, take only the central, square
+    portion.
+    """
+    max_size = max(img.size)
+    min_size = min(img.size)
+    x, y = img.size
+    x_diff, y_diff = (max_size - x) // 2, (max_size - y) // 2
+    return img.resize((
+        target_size,
+        target_size,
+    ), box=(
+        0 + y_diff,
+        0 + x_diff,
+        min_size + y_diff,
+        min_size + x_diff,
+    ))
 
 
 def _kanban_columns_from_tasks(tasks):
@@ -118,9 +156,28 @@ async def board(request):
             AND tasks.parent_task_id IS NULL
         """),
     ).fetchall()
+    user = conn.execute("SELECT * FROM users WHERE id=?", (int(request.cookies.get("user")),)).fetchone()
     page = Page(
         title="zutun — Board",
         body=Kanban(columns=_kanban_columns_from_tasks(tasks)),
+        logout=LogoutBar(**user),
+    )
+    return html(str(page))
+
+
+@app.get("/login")
+@allow_logged_out
+async def login(request):
+    items = []
+    for row in conn.execute(
+        "SELECT * FROM users"
+    ).fetchall():
+        items.append(UserChoice(**row))
+    page = LoggedOutPage(
+        title="zutun — Login",
+        body=UserChoices(
+            items,
+        )
     )
     return html(str(page))
 
@@ -129,8 +186,7 @@ async def board(request):
 async def backlog(request):
     items = []
     for i, t in enumerate(conn.execute(
-        TASK_QUERY.format(conditions=
-            """
+        TASK_QUERY.format(conditions="""
             tasks.location = 'backlog' AND tasks.parent_task_id IS NULL
         """),
     ).fetchall()):
@@ -177,7 +233,7 @@ def replace_task_references(text):
 
 @app.get("/tasks/<task_id>")
 async def view_task(request, task_id: int):
-    task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    task = conn.execute(TASK_QUERY.format(conditions="tasks.id = ?"), (task_id,)).fetchone()
     comments = conn.execute("SELECT * FROM comments WHERE task_id = ?", (task_id,)).fetchall()
     subtasks = conn.execute(
         TASK_QUERY.format(conditions="""
@@ -190,8 +246,8 @@ async def view_task(request, task_id: int):
     props = [StateSelector.from_task(task)]
     if not task["parent_task_id"]:
         props.append(TaskProperty("Location", task["location"]))
-    if task["assignee"]:
-        props.append(TaskProperty("Assignee", task["assignee"]))
+    if task["assignee_id"]:
+        props.append(TaskProperty("Assignee", Assignee.from_task(task)))
     if task["storypoints"]:
         props.append(TaskProperty("Storypoints", Storypoints(task["storypoints"])))
     if task["parent_task_id"]:
@@ -213,25 +269,67 @@ async def view_task(request, task_id: int):
     return html(str(page))
 
 
+@app.get("/users/new")
+@allow_logged_out
+async def new_user_form(request):
+    args = D(request.args)
+    return html(str(LoggedOutPage(
+        title="New user",
+        body=UserForm(
+            endpoint="/users/new",
+        ),
+    )))
+
+
+@app.post("/users/new")
+@allow_logged_out
+async def new_user(request):
+    data = D(request.form)
+    f = request.files["avatar"][0]
+    img = scale_image(Image.open(BytesIO(f.body)), 128)
+    io = BytesIO()
+    img.save(io, format='JPEG')
+    conn.execute(
+        "INSERT INTO users (name, avatar) VALUES (?, ?)",
+        (
+            data["name"],
+            f"data:jpg;base64,{base64.b64encode(io.getvalue()).decode()}"
+        ),
+    )
+    conn.commit()
+    return html("", headers={"HX-Refresh": "true"})
+
+
 @app.get("/tasks/new")
 async def new_task_form(request):
     args = D(request.args)
+    users = conn.execute("SELECT id, name, avatar FROM users").fetchall()
     return html(str(Dialog(
         title="New task",
         content=TaskForm(
             endpoint="/tasks/new",
             parent_task_id=args.get("parent_task_id"),
+            assignee_choices=[
+                AssigneeChoice(**user) for user in users
+            ],
         ),
     )))
 
 
 @app.get("/tasks/<task_id>/edit")
 async def edit_task_form(request, task_id: int):
-    task = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    task = conn.execute(TASK_QUERY.format(conditions="tasks.id = ?"), (task_id,)).fetchone()
+    users = conn.execute("SELECT id, name, avatar FROM users").fetchall()
     return html(str(Dialog(
         title="Edit task",
         content=TaskForm(
             endpoint=f"/tasks/{task_id}/edit",
+            assignee_choices=[
+                AssigneeChoice(
+                    selected="selected" if user["id"] == task["assignee_id"] else "",
+                    **user,
+                ) for user in users
+            ],
             **task,
         ),
     )))
@@ -255,11 +353,11 @@ async def post_comment(request, task_id: int):
 async def edit_task(request, task_id: int):
     data = D(request.form)
     conn.execute(
-        "UPDATE tasks SET summary=?, description=?, assignee=?, storypoints=?, parent_task_id=? WHERE id=?",
+        "UPDATE tasks SET summary=?, description=?, assignee_id=?, storypoints=?, parent_task_id=? WHERE id=?",
         (
             data["summary"],
             data.get("description"),
-            data.get("assignee"),
+            data.get("assignee_id"),
             data.get("storypoints"),
             data.get("parent_task_id"),
             task_id,
@@ -301,20 +399,24 @@ async def blank(request):
 
 
 @app.get("/pico.min.css")
+@allow_logged_out
 async def pico_css(request):
     return await file("pico.min.css", mime_type="text/css")
 
 
 @app.get("/style.css")
+@allow_logged_out
 async def style_css(request):
     return await file("style.css", mime_type="text/css")
 
 
 @app.get("/htmx.js")
+@allow_logged_out
 async def htmx_js(request):
     return await file("htmx.js", mime_type="text/javascript")
 
 
 @app.get("/hx-drag.js")
+@allow_logged_out
 async def hx_drag_js(request):
     return await file("hx-drag.js", mime_type="text/javascript")

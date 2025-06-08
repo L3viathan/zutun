@@ -130,3 +130,28 @@ input.input-prefix {
   padding-left: 10px !important;
   padding-right: 10px !important;
 }
+
+.login-selection {
+  min-width: 500px;
+  margin: auto;
+}
+
+.user-card {
+  margin: 20px;
+}
+
+.avatar {
+  height: 20px;
+  margin-right: 3px;
+  border-radius: 20px;
+}
+nav .avatar {
+  height: 36px;
+  margin-right: 5px;
+}
+
+.assignee.assignee-set{
+  background: #eee;
+  padding: 1px 5px 4px 3px;
+  border-radius: 12px;
+}

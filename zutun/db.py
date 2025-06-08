@@ -97,4 +97,28 @@ def add_selected_flag(cur):
         SET state='Done', location = 'graveyard' WHERE state = 'Closed'
     """)
 
+
+@migration(4)
+def add_users(cur):
+    cur.execute("""
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            avatar TEXT,
+            name TEXT
+        )
+    """)
+
+
+@migration(5)
+def reset_assignees(cur):
+    cur.execute("""
+        ALTER TABLE tasks
+        DROP COLUMN assignee
+    """)
+    cur.execute("""
+        ALTER TABLE tasks
+        ADD COLUMN assignee_id INTEGER
+    """)
+
+
 conn.isolation_level = orig_isolation_level
