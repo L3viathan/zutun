@@ -31,6 +31,7 @@ TASK_QUERY = """
         tasks.assignee_id AS assignee,
         COALESCE(tasks.storypoints, 0) AS storypoints,
         COUNT(subtask.id) AS n_subtasks,
+        SUM(subtask.state <> 'Done') AS n_incomplete_subtasks,
         COALESCE(SUM(subtask.storypoints), 0) AS storypoints_sum
     FROM tasks
     LEFT OUTER JOIN tasks subtask ON subtask.parent_task_id = tasks.id
@@ -38,6 +39,7 @@ TASK_QUERY = """
     WHERE
         {conditions}
     GROUP BY tasks.id
+    ORDER BY n_incomplete_subtasks ASC
 """
 
 @app.on_request
@@ -127,7 +129,7 @@ def scale_image(img, target_size):
     ))
 
 
-def _kanban_columns_from_tasks(tasks):
+def _kanban_columns_from_tasks(tasks, parent_task=None):
     columns = {
         state: [] for state in STATES
     }
@@ -139,18 +141,49 @@ def _kanban_columns_from_tasks(tasks):
             TaskCard.from_row(task, draggable=True),
         )
         storypoints[task["state"]] += (task["storypoints_sum"] or task["storypoints"])
-    return KanbanColumns([
-        KanbanColumn(
-            name=state,
-            items=columns[state] or NoTasksPlaceholder(),
-            total=storypoints[state],
+    result = [
+        KanbanColumns(
+            [
+                KanbanColumn(
+                    name=state,
+                    heading=f"<h4>{state} <small>({storypoints[state]})</small></h4><hr>" if not parent_task else None,
+                    items=columns[state] or NoTasksPlaceholder(),
+                )
+                for state in STATES
+            ],
+            parent_task=TaskRow.from_row(parent_task) if parent_task else None,
         )
-        for state in STATES
-    ])
+    ]
+    return SimpleContainer(result)
+
+
+def _kanban_board_from_tasks(tasks):
+    parent_task_ids = [task["id"] for task in tasks if task["n_incomplete_subtasks"]]
+    if parent_task_ids:
+        subtasks = conn.execute(
+            TASK_QUERY.format(conditions=f"""
+                tasks.parent_task_id IN ({','.join('?'*len(parent_task_ids))})
+            """,
+            ),
+            parent_task_ids,
+        ).fetchall()
+    else:
+        subtasks = None
+
+    rows = [_kanban_columns_from_tasks([task for task in tasks if not task["n_incomplete_subtasks"]])]
+    for task in tasks:
+        if task["n_incomplete_subtasks"]:
+            rows.append(_kanban_columns_from_tasks(
+                [subtask for subtask in subtasks if subtask["parent_task_id"] == task["id"]],
+                parent_task=task,
+            ))
+    return rows
 
 
 @app.get("/")
 async def board(request):
+    user = conn.execute("SELECT * FROM users WHERE id=?", (int(request.cookies.get("user")),)).fetchone()
+
     columns = []
     tasks = conn.execute(
         TASK_QUERY.format(conditions="""
@@ -158,10 +191,9 @@ async def board(request):
             AND tasks.parent_task_id IS NULL
         """),
     ).fetchall()
-    user = conn.execute("SELECT * FROM users WHERE id=?", (int(request.cookies.get("user")),)).fetchone()
     page = Page(
         title="zutun — Board",
-        body=Kanban(columns=_kanban_columns_from_tasks(tasks)),
+        body=Kanban(columns=_kanban_board_from_tasks(tasks)),
         logout=LogoutBar(**user),
     )
     return html(str(page))
@@ -291,7 +323,7 @@ async def view_task(request, task_id: int):
                 created_at_human=naturaltime(datetime.fromisoformat(comment["created_at"])),
                 text=replace_task_references(comment["text"]),
             ) for comment in comments],
-            subtasks=Subtasks(_kanban_columns_from_tasks(subtasks)) if subtasks else None,
+            subtasks=Subtasks(_kanban_board_from_tasks(subtasks)) if subtasks else None,
         ),
         logout=LogoutBar(**user),
     )
@@ -402,7 +434,7 @@ async def edit_task(request, task_id: int):
 async def finish_sprint(request):
     cur = conn.cursor()
     cur.execute("UPDATE tasks SET location='graveyard' WHERE location = 'selected' AND state = 'Done'")
-    cur.execute("UPDATE tasks SET location='backlog' WHERE location = 'selected' AND state <> 'Closed'")
+    cur.execute("UPDATE tasks SET location='backlog' WHERE location = 'selected' AND state <> 'Done'")
     conn.commit()
     return html("", headers={"HX-Location": "/backlog"})
 

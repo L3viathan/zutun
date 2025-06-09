@@ -63,10 +63,14 @@ class Subtasks(Component):
 
 class KanbanColumns(Component):
     """
+    {parent_task}
     <div hx-ext="drag" class="grid kanban">
       {_0}
     </div>
     """
+
+class SimpleContainer(Component):
+    """{_0}"""
 
 
 class UserChoice(Component):
@@ -114,8 +118,7 @@ class NoTasksPlaceholder(Component):
 class KanbanColumn(Component):
     """
     <div class="kanban-col kanban-col-{name}">
-      <h4>{name} <small>({total})</small></h4>
-      <hr>
+      {heading}
       <div class="kanban-col-items" hx-drop='{{"state": "{name}"}}' hx-drop-action="/tasks/state">
         {items}
       </div>
@@ -128,6 +131,35 @@ class TaskCard(Component):
     <article class="task-card" hx-drag='{{"task": "{id}"}}' draggable="{draggable}">
       {buttons}
       <a href="/tasks/{id}"><span class="id">{id}</span> <strong>{summary}</strong></a><br>
+      <small>{details}</small>
+    </article>
+    """
+
+    @classmethod
+    def from_row(cls, row, with_select_button=False, draggable=False):
+        details = [
+            User.from_task(row),
+            Storypoints(row["storypoints_sum"] + row["storypoints"]),
+        ]
+        if row["n_subtasks"]:
+            details.append(f"{row['n_subtasks']} subtasks")
+        data = {
+            "id": row["id"],
+            "summary": row["summary"],
+            "details": details,
+        }
+        if with_select_button:
+            data["buttons"] = SelectButton(id=row["id"])
+        data["draggable"] = str(draggable).lower()
+        return cls(**data)
+
+    sep = " · "
+
+
+class TaskRow(Component):
+    """
+    <article class="task-card">
+      <a href="/tasks/{id}"><span class="id">{id}</span> <strong>{summary}</strong></a>
       <small>{details}</small>
     </article>
     """
