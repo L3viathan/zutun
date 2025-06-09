@@ -142,22 +142,21 @@ def _kanban_columns_from_tasks(tasks, parent_task=None):
             TaskCard.from_row(task, draggable=True),
         )
         storypoints[task["state"]] += task["storypoints_sum"] or task["storypoints"]
-    result = [
-        KanbanColumns(
-            [
-                KanbanColumn(
-                    name=state,
-                    heading=f"<h4>{state} <small>({storypoints[state]})</small></h4><hr>"
-                    if not parent_task
-                    else None,
-                    items=columns[state] or NoTasksPlaceholder(),
-                )
-                for state in STATES
-            ],
-            parent_task=TaskRow.from_row(parent_task) if parent_task else None,
-        )
-    ]
-    return SimpleContainer(result)
+    result = KanbanColumns(
+        [
+            KanbanColumn(
+                name=state,
+                heading=f"<h4>{state} <small>({storypoints[state]})</small></h4><hr>"
+                if not parent_task
+                else None,
+                items=columns[state] or NoTasksPlaceholder(),
+            )
+            for state in STATES
+        ],
+    )
+    if parent_task:
+        result = TaskRow.from_row(parent_task, items=result)
+    return result
 
 
 def _kanban_board_from_tasks(tasks):

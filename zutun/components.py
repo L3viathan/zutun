@@ -72,10 +72,6 @@ class KanbanColumns(Component):
     """
 
 
-class SimpleContainer(Component):
-    """{_0}"""
-
-
 class UserChoice(Component):
     """
     <div class="user-card">
@@ -164,11 +160,12 @@ class TaskRow(Component):
     <article class="task-card">
       <a href="/tasks/{id}"><span class="id">{id}</span> <strong>{summary}</strong></a>
       <small>{details}</small>
+      {items}
     </article>
     """
 
     @classmethod
-    def from_row(cls, row, with_select_button=False, draggable=False):
+    def from_row(cls, row, items):
         details = [
             User.from_task(row),
             Storypoints(row["storypoints_sum"] + row["storypoints"]),
@@ -179,10 +176,8 @@ class TaskRow(Component):
             "id": row["id"],
             "summary": row["summary"],
             "details": details,
+            "items": items,
         }
-        if with_select_button:
-            data["buttons"] = SelectButton(id=row["id"])
-        data["draggable"] = str(draggable).lower()
         return cls(**data)
 
     sep = " · "
