@@ -1,5 +1,4 @@
 import os
-import base64
 import sys
 import sqlite3
 

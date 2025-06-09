@@ -7,7 +7,7 @@ from datetime import datetime
 from PIL import Image
 from humanize import naturaltime
 from sanic import Sanic
-from sanic.response import html, file, redirect, HTTPResponse, raw
+from sanic.response import html, file, redirect, HTTPResponse
 
 from zutun.components import *
 from zutun.db import conn
@@ -200,7 +200,6 @@ async def board(request):
         "SELECT * FROM users WHERE id=?", (int(request.cookies.get("user")),)
     ).fetchone()
 
-    columns = []
     tasks = conn.execute(
         TASK_QUERY.format(
             conditions="""
@@ -383,7 +382,6 @@ async def view_task(request, task_id: int):
 @app.get("/users/new")
 @allow_logged_out
 async def new_user_form(request):
-    args = D(request.args)
     return html(
         str(
             LoggedOutPage(
