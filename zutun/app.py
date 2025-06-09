@@ -98,7 +98,8 @@ async def login_as(request, user):
     return response
 
 
-REF_PATTERN = re.compile(r"#(\d+)\b")
+TASK_PATTERN = re.compile(r"#(\d+)\b")
+USER_PATTERN = re.compile(r"@(\d+)\b")
 
 def D(multival_dict):
     return {key: val[0] for key, val in multival_dict.items()}
@@ -228,10 +229,19 @@ def _replace_task_ref(match):
     return str(TaskLink(**task))
 
 
+def _replace_user_ref(match):
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (int(match.group(1)),)).fetchone()
+    return str(User(
+        user_set="user-set",
+        name=user["name"],
+        avatar=user["avatar"],
+    ))
+
+
 def replace_task_references(text):
     if not text:
         return text
-    return REF_PATTERN.sub(_replace_task_ref, text)
+    return USER_PATTERN.sub(_replace_user_ref, TASK_PATTERN.sub(_replace_task_ref, text))
 
 
 @app.get("/tasks/<task_id>")
