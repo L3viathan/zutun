@@ -35,12 +35,13 @@ def migration(number):
                 cur.execute("ROLLBACK")
                 sys.exit(1)
             cur.close()
+
     return deco
 
 
 @migration(0)
 def initial(cur):
-    cur.execute( """
+    cur.execute("""
         CREATE TABLE state (version INTEGER)
     """)
     cur.execute("""

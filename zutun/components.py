@@ -13,12 +13,16 @@ def coalesce(*args):
 class Component:
     sep = ""
     default = defaultdict(str)
+
     def __init__(self, *args, **kwargs):
         self.kwargs = defaultdict(
             str,
             {
-                **{f"_{i}": coalesce(arg, self.default[i]) for i, arg in enumerate(args)},
-                 **{k: coalesce(v, self.default[k]) for k, v in kwargs.items()}
+                **{
+                    f"_{i}": coalesce(arg, self.default[i])
+                    for i, arg in enumerate(args)
+                },
+                **{k: coalesce(v, self.default[k]) for k, v in kwargs.items()},
             },
         )
 
@@ -26,11 +30,9 @@ class Component:
         parts = []
         for k, v in self.kwargs.items():
             parts.append(f"{k}={v!r}")
-        return f"""<{self.__class__.__name__}{
-            f' {" ".join(parts)}'
-            if parts
-            else ''
-            }>"""
+        return (
+            f"""<{self.__class__.__name__}{f" {' '.join(parts)}" if parts else ""}>"""
+        )
 
     def __str__(self):
         t_kwargs = {}
@@ -68,6 +70,7 @@ class KanbanColumns(Component):
       {_0}
     </div>
     """
+
 
 class SimpleContainer(Component):
     """{_0}"""
@@ -275,11 +278,15 @@ class LoggedOutPage(Component):
     """
 
 
-class Page(Component):
-    ...
-Page.__doc__ = LoggedOutPage.__doc__.replace("<!- LOGOUT -->", """
+class Page(Component): ...
+
+
+Page.__doc__ = LoggedOutPage.__doc__.replace(
+    "<!- LOGOUT -->",
+    """
     <li>{logout}</li>
-""")
+""",
+)
 
 
 class Dialog(Component):
