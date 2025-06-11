@@ -31,11 +31,13 @@ TASK_QUERY = """
         tasks.assignee_id AS assignee,
         COALESCE(tasks.storypoints, 0) AS storypoints,
         COUNT(subtask.id) AS n_subtasks,
+        COUNT(c.id) AS n_comments,
         SUM(subtask.state <> 'Done') AS n_incomplete_subtasks,
         COALESCE(SUM(subtask.storypoints), 0) AS storypoints_sum
     FROM tasks
     LEFT OUTER JOIN tasks subtask ON subtask.parent_task_id = tasks.id
     LEFT JOIN users u ON tasks.assignee_id = u.id
+    LEFT OUTER JOIN comments c ON c.task_id = tasks.id
     WHERE
         {conditions}
     GROUP BY tasks.id

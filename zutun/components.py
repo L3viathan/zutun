@@ -142,6 +142,8 @@ class TaskCard(Component):
         ]
         if row["n_subtasks"]:
             details.append(f"{row['n_subtasks']} subtasks")
+        if row["n_comments"]:
+            details.append(f"{row['n_comments']} 💬")
         data = {
             "id": row["id"],
             "summary": row["summary"],
@@ -172,6 +174,8 @@ class TaskRow(Component):
         ]
         if row["n_subtasks"]:
             details.append(f"{row['n_subtasks']} subtasks")
+        if row["n_comments"]:
+            details.append(f"{row['n_comments']} 💬")
         data = {
             "id": row["id"],
             "summary": row["summary"],
