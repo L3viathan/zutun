@@ -159,7 +159,7 @@ class TaskCard(Component):
 
 class TaskRow(Component):
     """
-    <article class="task-card">
+    <article class="task-card task-row">
       <a href="/tasks/{id}"><span class="id">{id}</span> <strong>{summary}</strong></a>
       <small>{details}</small>
       {items}
