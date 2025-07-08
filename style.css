@@ -169,7 +169,7 @@ nav .avatar {
   margin-right: -21px;
 }
 
-@media (orientation: portrait) {
+@media (pointer:coarse) {
   .container {
     max-width: 100%;
     padding-left: 10px;
