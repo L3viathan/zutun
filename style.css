@@ -169,7 +169,7 @@ nav .avatar {
   margin-right: -21px;
 }
 
-@media (pointer:coarse) {
+@media (hover:none) {
   .container {
     max-width: 100%;
     padding-left: 10px;
