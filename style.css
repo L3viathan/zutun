@@ -168,3 +168,26 @@ nav .avatar {
   margin-left: -21px;
   margin-right: -21px;
 }
+
+@media (orientation: portrait) {
+  .container {
+    max-width: 100%;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .grid {
+    display: block;
+  }
+  button {
+    font-size: x-large;
+  }
+  h2 {
+    font-size: xxx-large;
+    button {
+      font-size: xx-large;
+    }
+  }
+  nav {
+    font-size: 150%;
+  }
+}
