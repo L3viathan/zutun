@@ -197,4 +197,8 @@ nav .avatar {
   .task-card .kanban-col>h4 {
     display: inherit !important;
   }
+  dialog article {
+    max-width: 100% !important;
+    max-height: 100% !important;
+  }
 }
