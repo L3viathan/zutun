@@ -148,9 +148,7 @@ def _kanban_columns_from_tasks(tasks, parent_task=None):
         [
             KanbanColumn(
                 name=state,
-                heading=f"<h4>{state} <small>({storypoints[state]})</small></h4><hr>"
-                if not parent_task
-                else None,
+                heading=f"<h4>{state} <small>({storypoints[state]})</small></h4><hr>",
                 items=columns[state] or NoTasksPlaceholder(),
             )
             for state in STATES
