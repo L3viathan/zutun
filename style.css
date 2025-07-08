@@ -171,23 +171,23 @@ nav .avatar {
 
 @media (hover:none) {
   .container {
-    max-width: 100%;
-    padding-left: 10px;
-    padding-right: 10px;
+    max-width: 100% !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
   }
   .grid {
-    display: block;
+    display: block !important;
   }
   button {
-    font-size: x-large;
+    font-size: x-large !important;
   }
   h2 {
-    font-size: xxx-large;
+    font-size: xxx-large !important;
     button {
-      font-size: xx-large;
+      font-size: xx-large !important;
     }
   }
   nav {
-    font-size: 150%;
+    font-size: 150% !important;
   }
 }
