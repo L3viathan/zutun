@@ -419,6 +419,7 @@ async def new_task_form(request):
                 title="New task",
                 content=TaskForm(
                     endpoint="/tasks/new",
+                    selected=args.get("selected"),
                     parent_task_id=args.get("parent_task_id"),
                     assignee_choices=[AssigneeChoice(**user) for user in users],
                 ),
@@ -506,13 +507,14 @@ async def finish_sprint(request):
 async def new_task(request):
     data = D(request.form)
     conn.execute(
-        "INSERT INTO tasks (summary, description, assignee_id, storypoints, parent_task_id, state, location) VALUES (?, ?, ?, ?, ?, 'ToDo', 'backlog')",
+        "INSERT INTO tasks (summary, description, assignee_id, storypoints, parent_task_id, state, location) VALUES (?, ?, ?, ?, ?, 'ToDo', ?)",
         (
             data["summary"],
             data.get("description"),
             data.get("assignee_id") or None,
             data.get("storypoints"),
             data.get("parent_task_id"),
+            "selected" if data.get("selected") else "backlog",
         ),
     )
     conn.commit()

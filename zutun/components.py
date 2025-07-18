@@ -48,6 +48,7 @@ class Kanban(Component):
     """
     <h2>Current sprint
         <button hx-post="/finish-sprint" hx-select="body" hx-target="body" hx-replace="outerHTML" hx-confirm="Are you sure you want to close the sprint?">Finish sprint</button>
+        <button hx-get="/tasks/new?selected=checked" hx-target="#popoverholder">New selected task</button>
     </h2>
     <article>
     {columns}
@@ -394,6 +395,9 @@ class TaskForm(Component):
         >
         </fieldset>
     </label>
+    <label for="selected">
+        <input id="selected" name="selected" type="checkbox" role="switch" {selected}/>
+        Selected
     </fieldset>
     <input
         type="submit"
